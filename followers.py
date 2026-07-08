@@ -1,7 +1,73 @@
 import sys
 import os
+import json
 from instagrapi import Client
-from instagrapi.exceptions import BadPassword, ChallengeRequired, PleaseWaitFewMinutes, TwoFactorRequired
+from instagrapi.exceptions import (
+    BadPassword,
+    ChallengeRequired,
+    PleaseWaitFewMinutes,
+    TwoFactorRequired,
+    FeedbackRequired,
+    LoginRequired,
+    SentryBlock,
+    AccountContactPointRequired,
+    ReloginAttemptExceeded,
+)
+
+
+def login_with_credentials(cl):
+    username = input(">> Username Instagram: ").strip()
+    password = input(">> Password Instagram: ").strip()
+    if not username or not password:
+        print("[!] Username dan password wajib diisi.")
+        return None
+
+    print("\n[*] Sedang login...")
+    try:
+        cl.login(username, password)
+        cl.dump_settings("session.json")
+        print("[*] Login berhasil, session tersimpan.\n")
+        return cl.user_id
+    except BadPassword:
+        print("[!] Password salah.")
+        print("    Tapi bisa juga Instagram blokir login dari aplikasi tidak resmi.")
+        print("    Coba login di browser dulu, lalu ambil sessionid untuk login via session.")
+    except TwoFactorRequired:
+        code = input(">> Kode 2FA dari email/telepon: ").strip()
+        cl.login(username, password, verification_code=code)
+        cl.dump_settings("session.json")
+        return cl.user_id
+    except ChallengeRequired:
+        print("[!] Instagram minta verifikasi (challenge).")
+        print("    Buka Instagram di browser, selesaikan challenge, lalu coba lagi.")
+    except FeedbackRequired:
+        msg = cl.last_json.get("feedback_message", cl.last_json.get("message", ""))
+        print(f"[!] Instagram minta konfirmasi: {msg}")
+        print("    Buka Instagram di browser dan selesaikan.")
+    except PleaseWaitFewMinutes:
+        print("[!] Harap tunggu beberapa menit sebelum coba lagi.")
+    except SentryBlock:
+        print("[!] Login diblokir Instagram. Coba pakai VPN atau koneksi lain.")
+    except AccountContactPointRequired:
+        print("[!] Instagram minta verifikasi nomor telepon/email.")
+        print("    Buka Instagram di browser dan selesaikan.")
+    except ReloginAttemptExceeded:
+        print("[!] Terlalu banyak percobaan login. Tunggu beberapa saat.")
+    except Exception as e:
+        last_json = getattr(cl, "last_json", {})
+        msg = last_json.get("message", str(e))
+        print(f"[!] Gagal login: {msg}")
+        if "challenge" in str(last_json).lower():
+            print("    Kemungkinan Instagram minta challenge. Selesaikan di browser.")
+    return None
+
+
+def login_with_session_from_file(cl):
+    with open("session.json") as f:
+        data = json.load(f)
+    sessionid = data["cookies"]["sessionid"]
+    cl.login_by_sessionid(sessionid)
+    return cl.user_id
 
 
 def main():
@@ -9,80 +75,29 @@ def main():
     print("   INSTAGRAM FOLLOWERS CHECKER")
     print("=" * 60)
 
-    # Cek session tersimpan
     cl = Client()
     cl.delay_range = [2, 5]
+    cl.set_user_agent()
+    cl.set_device()
 
     if os.path.exists("session.json"):
         load = input("\n>> Pakai session tersimpan? (y/n): ").strip().lower()
         if load == "y":
             try:
-                cl.load_settings("session.json")
-                cl.login_by_sessionid(cl.get_settings()["cookies"]["sessionid"])
+                user_id = login_with_session_from_file(cl)
                 print("[*] Login dengan session tersimpan berhasil!\n")
-                user_id = cl.user_id
             except Exception as e:
                 print(f"[!] Session expired: {e}")
                 os.remove("session.json")
                 return
         else:
             os.remove("session.json")
-            username = input(">> Username Instagram: ").strip()
-            password = input(">> Password Instagram: ").strip()
-            if not username or not password:
-                print("[!] Username dan password wajib diisi.")
-                return
-            print("\n[*] Sedang login...")
-            try:
-                cl.login(username, password)
-                cl.dump_settings("session.json")
-                print("[*] Session tersimpan.\n")
-                user_id = cl.user_id
-            except BadPassword:
-                print("[!] Password salah.")
-                return
-            except TwoFactorRequired:
-                code = input(">> Kode 2FA dari email/telepon: ").strip()
-                cl.login(username, password, verification_code=code)
-                cl.dump_settings("session.json")
-                user_id = cl.user_id
-            except ChallengeRequired:
-                print("[!] Instagram minta verifikasi. Coba buka Instagram di browser dan selesaikan challenge.")
-                return
-            except PleaseWaitFewMinutes:
-                print("[!] Harap tunggu beberapa menit sebelum coba lagi.")
-                return
-            except Exception as e:
-                print(f"[!] Gagal login: {e}")
+            user_id = login_with_credentials(cl)
+            if user_id is None:
                 return
     else:
-        username = input(">> Username Instagram: ").strip()
-        password = input(">> Password Instagram: ").strip()
-        if not username or not password:
-            print("[!] Username dan password wajib diisi.")
-            return
-        print("\n[*] Sedang login...")
-        try:
-            cl.login(username, password)
-            cl.dump_settings("session.json")
-            print("[*] Session tersimpan.\n")
-            user_id = cl.user_id
-        except BadPassword:
-            print("[!] Password salah.")
-            return
-        except TwoFactorRequired:
-            code = input(">> Kode 2FA dari email/telepon: ").strip()
-            cl.login(username, password, verification_code=code)
-            cl.dump_settings("session.json")
-            user_id = cl.user_id
-        except ChallengeRequired:
-            print("[!] Instagram minta verifikasi. Coba buka Instagram di browser dan selesaikan challenge.")
-            return
-        except PleaseWaitFewMinutes:
-            print("[!] Harap tunggu beberapa menit sebelum coba lagi.")
-            return
-        except Exception as e:
-            print(f"[!] Gagal login: {e}")
+        user_id = login_with_credentials(cl)
+        if user_id is None:
             return
 
     max_input = input("Jumlah maksimal yang dicek (kosongkan untuk semua): ").strip()
