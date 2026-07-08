@@ -1,6 +1,7 @@
 import sys
 import os
 import json
+import time
 from instagrapi import Client
 from instagrapi.exceptions import (
     BadPassword,
@@ -137,6 +138,39 @@ def main():
         print(f"\n[!] KAMU TIDAK FOLLOW MEREKA ({len(not_followed_by_me)}):")
         for i, (_, uname) in enumerate(not_followed_by_me, 1):
             print(f"   {i:3d}. @{uname}")
+
+    if not_follow_back:
+        print("\n" + "=" * 60)
+        print("   UNFOLLOW OTOMATIS")
+        print("=" * 60)
+        q = input("\n>> Mau unfollow yang tidak follow balik? (y/n): ").strip().lower()
+        if q == "y":
+            print("\n[*] Ketik nomor yang ingin DIKECUALIKAN (dipisah koma).")
+            print("    Contoh: 1,5,10,23")
+            print("    Enter langsung = unfollow semua.\n")
+            skip_input = input(">> Nomor yang dilewati: ").strip()
+            skip_set = set()
+            if skip_input:
+                for part in skip_input.split(","):
+                    part = part.strip()
+                    if part.isdigit():
+                        idx = int(part)
+                        if 1 <= idx <= len(not_follow_back):
+                            skip_set.add(idx)
+
+            print(f"\n[*] Mulai unfollow {len(not_follow_back) - len(skip_set)} akun...\n")
+            for i, (pk, uname) in enumerate(not_follow_back, 1):
+                if i in skip_set:
+                    print(f"   [-] {i}. @{uname} dilewati")
+                    continue
+                try:
+                    cl.user_unfollow(int(pk))
+                    print(f"   [{i}] @{uname} berhasil diunfollow")
+                    time.sleep(10)
+                except Exception as e:
+                    print(f"   [!] Gagal unfollow @{uname}: {e}")
+                    time.sleep(30)
+            print("\n[*] Selesai!")
 
     print("\n" + "=" * 60)
 

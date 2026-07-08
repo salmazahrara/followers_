@@ -9,6 +9,7 @@ Tools Python untuk cek siapa aja yang **tidak follow balik** di Instagram.
 - Session tersimpan otomatis untuk penggunaan selanjutnya
 - Lihat daftar yang **tidak follow balik**
 - Lihat daftar yang **kamu tidak follow**
+- **Unfollow otomatis** — pilih manual akun yang mau dikecualikan
 - Batas jumlah cek bisa diatur
 
 ## Persiapan
